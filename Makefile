@@ -1,13 +1,20 @@
 # Makefile,v
 # Copyright (c) INRIA 2007-2017
 
+WD=$(shell pwd)
+TOP=.
+include $(TOP)/config/Makefile
 
-OCAMLFIND=ocamlfind
-NOT_OCAMLFIND=not-ocamlfind
-MKCAMLP5=mkcamlp5
+DESTDIR=
+RM=rm
+
+LAUNCH=
+OCAMLFIND=$(LAUNCH) ocamlfind
+NOT_OCAMLFIND=$(LAUNCH) not-ocamlfind
+MKCAMLP5=$(LAUNCH) mkcamlp5
 SYNTAX := camlp5o
 
-PACKAGES := fmt,pa_ppx.base,camlp5,camlp5.quotations,camlp5.extfun
+PACKAGES := $(PACKAGES),fmt,pa_ppx.base
 TARGET := pa_ppx_seq.cma
 ML := pa_seq.ml
 CMO := $(ML:.ml=.cmo)
@@ -18,10 +25,19 @@ CMTI := $(MLI:.mli=.cmti)
 
 OCAMLCFLAGS := $(OCAMLCFLAGS) -linkall
 
-all: $(TARGET) $(TARGET:.cma=.cmxa)
+all: $(TARGET) $(TARGET:.cma=.cmxa) camlp5.pa_ppx_seq camlp5.pa_ppx_seq.opt
 	$(MAKE) DESTDIR=$(WD)/$(TOP)/local-install/ install
 
+test:: all
+	make -C test clean all-tests
+
 doc: $(CMT) $(CMTI)
+
+camlp5.pa_ppx_seq: $(TARGET)
+	$(MKCAMLP5) -verbose -package fmt,camlp5.pa_r,camlp5.pr_r,pa_ppx.base $(TARGET) -o $@
+
+camlp5.pa_ppx_seq.opt: $(TARGET:.cma=.cmxa)
+	$(MKCAMLP5).opt -verbose -package fmt,camlp5.pa_r,camlp5.pr_r,pa_ppx.base $(TARGET:.cma=.cmxa) -o $@
 
 META: META.pl
 	./META.pl > META
@@ -33,7 +49,8 @@ install::
 	$(RM) -f META
 
 clean::
-	rm -rf META
+	rm -rf META camlp5.pa_ppx_seq* local-install
+	make -C test clean
 
 $(TARGET): $(CMO)
 	$(OCAMLFIND) ocamlc $(DEBUG) $(CMO) -a -o $(TARGET)
